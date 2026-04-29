@@ -1,0 +1,104 @@
+clc; close all; clear all;
+
+%% 线性 Volterra 积分方程 (LVIE) 测试主程序
+% 对应方法: Pesudu Franklin Newton-Cotes (Linear Version)
+n = 32;             % 细网格阶数 (Fine Grid)
+vp = 1024;          % 验证点数量
+K = 1;              % 基函数阶数
+num_runs = 10;      % 测速循环次数
+
+%% Example 1
+% RF = @(x) exp(x);
+% kf = @(x,t) exp(x-t);
+% fx = @(x) (1-x).*exp(x);
+
+%% Example 2
+% fx=@(x)1/2*(x.^2).*exp(-x);
+% kf=@(x,t)1/2*((x-t).^2).*(exp(-x+t));
+% RF=@(x)1/3-1/3*exp(-(3/2)*x).*(cos(sqrt(3)/2*x)+sqrt(3)*sin(sqrt(3)/2*x));
+
+%% Example 3
+% fx=@(x)1-x-x.^2./2;
+% kf=@(x,t)(x-t);
+% RF=@(x)1-sinh(x);
+
+%% Example 4
+% F-transform utility in the operational-matrix approach to the Volterra integral equation
+fx = @(x) exp(x) - 1./(1+x).*(exp(x.*(1+x))-1);
+kf = @(x,t) exp(x.*t);
+RF = @(x) exp(x);
+
+%% 1. 循环测速 (Performance Test for Fine Grid n)
+fprintf('-------------------------------------------\n');
+fprintf('正在准备 LVIE 测试 (Fine n=%d, Coarse n=%d, K=%d)...\n', n, n/2, K);
+
+time_records = zeros(num_runs, 1);
+
+% [预热] Warm-up
+fprintf('正在进行预热运行...\n');
+[~, ~] = LVIE_PGFM_NC(fx, n, K, kf);
+
+% [循环] Loop Execution
+fprintf('正在进行 %d 次循环测速 (n=%d)...\n', num_runs, n);
+for i = 1:num_runs
+    t_tick = tic;
+    
+    % 求解细网格 (Fine Grid)
+    [ua_coeffs1, ~] = LVIE_PGFM_NC(fx, n, K, kf);
+    
+    % 计算细网格误差
+    % 变量名重命名为 _fine 以明确含义
+    pointwise_error_fine = PE1_PGFM(RF, ua_coeffs1, vp, K);
+    
+    time_records(i) = toc(t_tick);
+end
+
+% 计算平均时间
+avg_time = mean(time_records);
+fprintf('网格 n=%d 平均耗时: %.6f 秒\n', n, avg_time);
+
+%% 2. 精度与全局收敛阶分析 (Accuracy & Convergence)
+
+% [计算粗网格] Coarse Grid Calculation (n/2)
+fprintf('正在计算粗网格对照组 (n=%d)...\n', n/2);
+[ua_coeffs2, ~] = LVIE_PGFM_NC(fx, n/2, K, kf);
+pointwise_error_coarse = PE1_PGFM(RF, ua_coeffs2, vp, K);
+
+% --- 全局误差范数与收敛阶计算 (去除首尾边界点) ---
+
+% 1. 数据切片：去除第1个和最后1个点 (Interior Points Only)
+% 对于 Volterra 方程，初始点(t=0)误差通常为0，剔除它能避免 log(0) 干扰统计
+inner_err_fine   = pointwise_error_fine(2:end-1);
+inner_err_coarse = pointwise_error_coarse(2:end-1);
+
+% 2. 计算离散 L-infinity 范数 (内部最大绝对误差)
+E_inf_fine   = max(abs(inner_err_fine));
+E_inf_coarse = max(abs(inner_err_coarse));
+
+% 3. 计算离散 L2 范数 (使用 RMS 近似)
+E_rms_fine   = rms(inner_err_fine);
+E_rms_coarse = rms(inner_err_coarse);
+
+% 4. 计算全局收敛阶 (Global Convergence Order)
+% Order = log2( ||E_{N/2}|| / ||E_N|| )
+global_order_inf = log2(E_inf_coarse / E_inf_fine);
+global_order_l2  = log2(E_rms_coarse / E_rms_fine);
+
+%% 3. 结果格式化输出
+fprintf('\n-------------------------------------------\n');
+fprintf('LVIE (Volterra) 精度与收敛阶分析报告\n');
+fprintf('-------------------------------------------\n');
+fprintf('平均运行时间 (n=%d):\t %.6f 秒\n', n, avg_time);
+fprintf('验证点数量:\t\t %d (已剔除首尾边界点)\n', length(inner_err_fine));
+fprintf('-------------------------------------------\n');
+fprintf('Metric\t\t\t Error (N=%d)\t Error (N=%d)\t Order\n', n/2, n);
+fprintf('L_inf Norm (Max):\t %.4e\t %.4e\t %.4f\n', E_inf_coarse, E_inf_fine, global_order_inf);
+fprintf('L_2 Norm (RMS):\t\t %.4e\t %.4e\t %.4f\n', E_rms_coarse, E_rms_fine, global_order_l2);
+fprintf('-------------------------------------------\n');
+
+% 简要结论
+if global_order_inf > K
+    fprintf('结论: 算法表现出超收敛特性 (Order > K).\n');
+else
+    fprintf('结论: 算法收敛阶为 %.2f.\n', global_order_inf);
+end
