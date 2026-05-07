@@ -4,11 +4,11 @@
 clc; close all; clear all;
 
 %% 1. 问题定义与参数设置
-n = 512;            % 细网格阶数 (Fine Grid)
+n = 128;            % 细网格阶数 (Fine Grid)
 vp = 1024;          % 验证点数量
 iter = 100;         % 最大迭代次数
 tol = 1e-8;         % 迭代容差
-K = 2;              % 基函数阶数
+K = 4;              % 基函数阶数
 num_runs = 10;      % 测速循环次数
 %% 问题1
 
@@ -39,13 +39,13 @@ num_runs = 10;      % 测速循环次数
 %% 问题3
 
 % fx=@(x)exp(x)-(x.*exp(-x));
-
+% 
 % kf=@(x,t,u)exp(-x).*exp(-2.*t).*(u.^2);
-
+% 
 % kut=@(u)u.^2;
-
+% 
 % dkut=@(x,t,u)exp(-x).*exp(-2.*t).*(2*u);
-
+% 
 % RF=@(x)exp(x);
 
 %% 问题4 Example 5 Numerical Solution of Nonlinear Fredholm and Volterra Integrals by
@@ -55,11 +55,11 @@ num_runs = 10;      % 测速循环次数
 % Volterra Integrals by Newton–Kantorovich and Haar Wavelets Methods
 
 % fx=@(x)3/2-1/2*exp(-2*x);
-
+% 
 % kf=@(x,t,u)-(u.^2+u);
-
+% 
 % dkut=@(x,t,u)-(2*u+1);
-
+% 
 % RF=@(x)exp(-x);
 
 %% 问题5 A Multistep Legendre Pseudo-Spectral Method for Nonlinear Volterra Integral Equations
@@ -81,7 +81,8 @@ RF = @(x) ((1+x).*exp(-10.*x)+1).^0.5;
 
 %% 2. 初始值预计算
 fprintf('正在计算 Volterra 初值猜测 (Get_Volterra_Init_Coeffs)...\n');
-init_coeffs = Get_Volterra_Init_Coeffs(fx, kf, dkut, 0, 1, K);
+% init_coeffs = Get_Volterra_Init_Coeffs(fx, kf, dkut, 0, 1, K);
+init_coeffs = SolveVolterraNumeric(fx, kf, 0, 1, K);
 
 %% 3. 循环测速 (Performance Test for Fine Grid n)
 fprintf('-------------------------------------------\n');
